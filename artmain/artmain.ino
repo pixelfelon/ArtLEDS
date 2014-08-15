@@ -35,7 +35,7 @@
 #define ENERGY_LOW                       22
 #define ENERGY_20                        23
 #define ENERGY_40                        24
-#define ENERGY_50                        25
+#define ENERGY_60                        25
 #define ENERGY_80                        26
 #define ENERGY_100                       27
 #define ENERGY_200                       28

@@ -4,11 +4,11 @@
 #define DMX_USE_PORT1
 
 //Assorted definitions
-#define USED_CHANNELS 16
+#define USED_CHANNELS 32
 #define LEDS 148
 #define OFFSET 0
 #define S1_PIN 51
-#define LAYERS 4
+#define LAYERS 5
 
 //Channel Definitions
 #define BG_RED                           1
@@ -53,6 +53,7 @@ int curDMX[USED_CHANNELS];
 int DMX[USED_CHANNELS];
 int emberIntensity[LEDS];
 //layers[layer][led][1:r,2:g,3:b,4:a]=value
+//layer 0 is buffer
 byte layers[LAYERS][LEDS][4];
 
 //Define pi, because apparently it isn't predefined.
@@ -134,13 +135,13 @@ void processDMX() {
     //int DMXIN = DMXSerial.read(i);
     int DMXIN = DMX[i];
     //Removal of false zeros due to data loss
-    if(DMXIN==0 && prevDMX[i]!=0){
+    if(DMXIN==0 /*&& prevDMX[i]!=0*/){
       DMX[i]=prevDMX[i];
     }else{
       DMX[i]=DMXIN;
     }
     prevDMX[i]=curDMX[i];
-    curDMX[i]=DMXIN;
+    curDMX[i]=DMX[i];
   }
 }
 
@@ -164,7 +165,67 @@ uint32_t rainbow(int progress){
   return strip.Color(rv,bv,gv);
 }
 
+void setRangeC(int a, int b, int layer, int r, int g, int bl, int al){
+  for(int i=a;i<=b;i++){
+    layers[layer][i][0]=r;
+    layers[layer][i][1]=g;
+    layers[layer][i][2]=bl;
+    layers[layer][i][3]=al;
+  }
+}
+
+void setRangeI(int a, int b, int layer, uint32_t color, int al){
+ int
+    r = (int)(color >> 16),
+    g = (int)(color >>  8),
+    bl = (int)color;
+  for(int i=a;i<=b;i++){
+    layers[layer][i][0]=r;
+    layers[layer][i][1]=g;
+    layers[layer][i][2]=bl;
+    layers[layer][i][3]=al;
+  }
+}
+
+void blendColor(int n){
+  for(int c=0;c<3;c++){
+    for(int i=LAYERS;i>=1;i--){
+      float acol = layers[i][n][3];
+      float amul = (acol/255);
+      float ccol = layers[i][n][c];
+      float pcol = layers[0][n][c];
+      float tcol = ( ( ccol * ( amul ) ) + ( pcol * ( 1 - amul ) ) );
+      if(tcol<0){tcol=0;} if(tcol>255){tcol=255;}
+      layers[0][n][c]=(int)tcol;
+    }
+  }
+}
+
+void blendColors(){
+  for(int n=0;n<=LEDS;n++){
+    blendColor(n);
+  }
+}
+
+void writeColors(){
+  for(int i=OFFSET;i<=LEDS+OFFSET;i++){
+    strip.setPixelColor(i,layers[0][i][0],layers[0][i][1],layers[0][i][2]);
+  }
+}
+  
+void resetColors(){
+  for(int i=0;i<LAYERS;i++){
+    for(int n=0;n<LEDS;n++){
+      for(int c=0;c<4;c++){
+        layers[i][n][c]=1;
+      }
+    }
+  }
+}
+
 void loop() {
+  Serial.println("this");
+  resetColors();
   int cmils=millis();
   if(((cmils-tlDMX)>40)||(cmils<tlDMX)){
   //if((cmils % 40) == 0){
@@ -187,27 +248,38 @@ void loop() {
   //Serial.println(ch_three);
   
   uint32_t cCol = 0;
-  
-  if(DMX[4]>128){
-    if(rStep>255){rStep=0;}
-    cCol = rainbow(rStep);
-    rStep++;
-    delay(10);
-  }else{
-    cCol = strip.Color(DMX[1],DMX[2],DMX[3]);
+  if(rStep>255){rStep=0;}
+  if(DMX[NUKE_READY_TO_FIRE]>128){
+    setRangeI(0,LEDS,2,rainbow(rStep),255);
   }
+  if(DMX[RED_ALERT]>128){
+    if((rStep%16)<3){
+      setRangeC(upA,upB,1,255,0,0,215);
+    }else{
+      setRangeC(upA,upB,1,0,0,0,215);
+    }
+  }
+  {
+    //setRangeC(0,LEDS-1,2,DMX[1],DMX[2],DMX[3],255);
+  }
+  Serial.println("runs");
+  //setRangeC(0,LEDS-1,0,255,0,255,255);
+  rStep++;
+  delay(10);
   
   //Set whole strip as RGB light
-  for(int i=0;i<150;i++){
+  //for(int i=0;i<150;i++){
     //strip.setPixelColor(i,strip.Color(ch_one,ch_two,ch_three));
     //strip.setPixelColor(i,strip.Color(DMXSerial.read(1),DMXSerial.read(2),DMXSerial.read(3)));
     //strip.setPixelColor(i,strip.Color(DMX[1],DMX[2],DMX[3]));
-    strip.setPixelColor(i,cCol);
-  }
+  //  strip.setPixelColor(i,cCol);
+  //}
+  blendColors();
+  writeColors();
   strip.show();
   //DMX DELAY!
   //delay(40);
-  Serial.println(millis());
+  //Serial.println(millis());
   //Rainbow test delay
   //delay(10);
   //delay(5);

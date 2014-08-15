@@ -8,9 +8,9 @@
 #define S1_PIN 51
 
 //Create our arrays
-//int prevDMX[USED_CHANNELS];
-//int curDMX[USED_CHANNELS];
-//int DMX[USED_CHANNELS];
+int prevDMX[USED_CHANNELS];
+int curDMX[USED_CHANNELS];
+int DMX[USED_CHANNELS];
 int emberIntensity[LEDS];
 
 //Define pi, because apparently it isn't predefined.
@@ -18,6 +18,7 @@ const float pi = 3.14;
 
 //Globals for keeping track of things
 int rStep = 0;
+int tlDMX = 0;
 
 //Define (?) our strip
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(LEDS, S1_PIN, NEO_GRB + NEO_KHZ800);
@@ -29,17 +30,18 @@ void setup() {
   strip.begin();
   strip.show();
   //Initialize DMX buffers/arrays
-  //for(int i=0;i<USED_CHANNELS;i++){
-  //  prevDMX[i]=0;
-  //  curDMX[i]=0;
-  //  DMX[i]=0;
-  //}
+  for(int i=0;i<USED_CHANNELS;i++){
+    prevDMX[i]=0;
+    curDMX[i]=0;
+    DMX[i]=0;
+  }
 }
 
 //Make our DMX input more usable
-/*void processDMX() {
+void processDMX() {
   for(int i=1;i<USED_CHANNELS;i++){
-    int DMXIN = DMXSerial.read(i);
+    //int DMXIN = DMXSerial.read(i);
+    int DMXIN = DMX[i];
     //Removal of false zeros due to data loss
     if(DMXIN==0 && prevDMX[i]!=0){
       DMX[i]=prevDMX[i];
@@ -49,7 +51,15 @@ void setup() {
     prevDMX[i]=curDMX[i];
     curDMX[i]=DMXIN;
   }
-}*/
+}
+
+//Put the DMX into an array
+void readDMX() {
+  for(int i=1;i<USED_CHANNELS;i++){
+    DMX[i]=DMXSerial.read(i);
+    Serial.println(DMX[i]);
+  }
+}
 
 //Return a rainbow color based on progress from 0 to 255
 uint32_t rainbow(int progress){
@@ -64,11 +74,18 @@ uint32_t rainbow(int progress){
 }
 
 void loop() {
-  //processDMX();
-  //old
-  int ch_one=DMXSerial.read(1);
-  int ch_two=DMXSerial.read(2);
-  int ch_three=DMXSerial.read(3);
+  int cmils=millis();
+  if(((cmils-tlDMX)>40)||(cmils<tlDMX)){
+  //if((cmils % 40) == 0){
+    tlDMX=cmils;
+    while(DMXSerial.noDataSince()==0){}
+    readDMX();
+    processDMX();
+  //  Serial.print("Ran, millis=");
+  //  Serial.println(cmils);
+  }
+  
+  //readDMX();
   
   //Debugging
   //Serial.print("Got value on DMX Channel 1:");
@@ -78,8 +95,16 @@ void loop() {
   //Serial.print("Got value on DMX Channel 3:");
   //Serial.println(ch_three);
   
-  if(rStep>255){rStep=0;}
-  uint32_t cCol = rainbow(rStep);
+  uint32_t cCol = 0;
+  
+  if(DMX[4]>128){
+    if(rStep>255){rStep=0;}
+    cCol = rainbow(rStep);
+    rStep++;
+    delay(10);
+  }else{
+    cCol = strip.Color(DMX[1],DMX[2],DMX[3]);
+  }
   
   //Set whole strip as RGB light
   for(int i=0;i<150;i++){
@@ -89,9 +114,10 @@ void loop() {
     strip.setPixelColor(i,cCol);
   }
   strip.show();
-  rStep++;
   //DMX DELAY!
   //delay(40);
+  Serial.println(millis());
   //Rainbow test delay
   //delay(10);
+  //delay(5);
 }

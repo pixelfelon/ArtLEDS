@@ -5,7 +5,7 @@
 
 //Assorted definitions
 #define USED_CHANNELS 32
-#define LEDS 148
+#define LEDS 120
 #define OFFSET 0
 #define S1_PIN 51
 #define LAYERS 5
@@ -67,11 +67,12 @@ int rightA,rightB,upA,upB,leftA,leftB,downA,downB;
 //Define (?) our strip
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(LEDS+OFFSET, S1_PIN, NEO_GRB + NEO_KHZ800);
 
-void calculateSides(int aspect,int ratio) { //i.e. calculateSides(16,9); or calculateSides(4,3);
+void calculateSides(int ratio, int aspect) { //i.e. calculateSides(16,9); or calculateSides(4,3);
   int basePerimeter = (aspect*2)+(ratio*2);
   int multiplier = LEDS/basePerimeter;
   int modulo = LEDS % basePerimeter;
-  int adder = modulo/4;
+  int adder = modulo/8;
+  //int adder=0;
   int modulooo = modulo % 4;
   rightA=OFFSET+(adder*0);
   rightB=rightA+(aspect*multiplier)+(adder*1);
@@ -217,7 +218,7 @@ void resetColors(){
   for(int i=0;i<LAYERS;i++){
     for(int n=0;n<LEDS;n++){
       for(int c=0;c<4;c++){
-        layers[i][n][c]=1;
+        layers[i][n][c]=0;
       }
     }
   }
@@ -251,6 +252,12 @@ void loop() {
   if(rStep>255){rStep=0;}
   if(DMX[NUKE_READY_TO_FIRE]>128){
     setRangeI(0,LEDS,2,rainbow(rStep),255);
+  }
+  if(DMX[PLAYER_SHIELDS_ON]>128){
+    int mult=(rStep-128)/4;
+    cCol=strip.Color(15,40,200+mult);
+    setRangeI(leftA-4,leftB-7,1,cCol,215);
+    setRangeI(rightA,rightB,1,cCol,215);
   }
   if(DMX[RED_ALERT]>128){
     if((rStep%16)<3){
